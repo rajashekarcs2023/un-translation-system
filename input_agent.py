@@ -16,13 +16,13 @@ class TranslationResponse(Model):
 # Create Input Agent
 input_agent = Agent(
     name="input_agent",
-    port=8001,
+    port=8008,
     seed="input_agent_seed",
-    endpoint=["http://127.0.0.1:8001/submit"],
+    endpoint=["http://127.0.0.1:8008/submit"],
 )
 
 # Address of translation agent (you'll get this after running translation agent)
-TRANSLATION_AGENT_ADDRESS = "agent1qxxxx...your_translation_agent_address"
+TRANSLATION_AGENT_ADDRESS = "agent1qvhztjvxxrzuyeu4fy6qsag8c9zcn055q8mye90s5kcqejpzvjw7skllkfs"
 
 @input_agent.on_event("startup")
 async def input_start(ctx: Context):

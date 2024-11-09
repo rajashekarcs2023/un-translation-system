@@ -16,9 +16,9 @@ class TranslationResponse(Model):
 # Create Translation Agent
 translation_agent = Agent(
     name="translation_agent",
-    port=8002,
+    port=8007,
     seed="translation_agent_seed",
-    endpoint=["http://127.0.0.1:8002/submit"],
+    endpoint=["http://127.0.0.1:8007/submit"],
 )
 
 @translation_agent.on_event("startup")
