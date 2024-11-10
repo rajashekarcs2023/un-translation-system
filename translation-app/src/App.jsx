@@ -1,17 +1,9 @@
-import React, { useState } from 'react';
-import DocumentUpload from './components/DocumentUpload';
-import TranslationInterface from './components/TranslationInterface';
+import TranslationPage from './components/TranslationPage';
 
-export default function App() {
-  const [isWorking, setIsWorking] = useState(false);
-
+function App() {
   return (
-    
-      {!isWorking ? (
-        <DocumentUpload onStartWorking={() => setIsWorking(true)} />
-      ) : (
-        
-      )}
-    
+    <TranslationPage />
   );
 }
+
+export default App;
