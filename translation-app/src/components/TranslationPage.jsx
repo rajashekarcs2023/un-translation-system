@@ -19,7 +19,10 @@ function TranslationPage() {
   const [hoveringSuggestion, setHoveringSuggestion] = useState(null);
   const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
   const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
-  const [modifiedRanges, setModifiedRanges] = useState([]);
+  
+  
+  const [tempModifiedRanges, setTempModifiedRanges] = useState([]);
+ const [showSaveButton, setShowSaveButton] = useState(false);
 
   // Refs
   const textRef = useRef(null);
@@ -65,15 +68,15 @@ function TranslationPage() {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
       const containerRect = textRef.current.getBoundingClientRect();
-
+  
       // Calculate selection range
       const start = getTextOffset(textRef.current, range.startContainer, range.startOffset);
       const end = start + selectedText.length;
-
+  
       // Update selection states
       setSelectedTextRange({ start, end });
       setSelectedTranslatedText(selectedText);
-
+  
       // Show floating toolbar
       setToolbarPosition({
         top: rect.top - containerRect.top - 40,
@@ -86,7 +89,32 @@ function TranslationPage() {
       setSelectedTextRange({ start: 0, end: 0 });
     }
   };
+  // Add these states at the top
 
+
+// Add this component for the save button
+const SaveButton = () => showSaveButton && (
+  <button
+    onClick={() => {
+      setTempModifiedRanges([]); // Only clear tempModifiedRanges
+      setShowSaveButton(false);
+    }}
+    style={{
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      backgroundColor: '#22c55e',
+      color: 'white',
+      padding: '0.5rem 1rem',
+      borderRadius: '0.375rem',
+      border: 'none',
+      cursor: 'pointer',
+      zIndex: 1000
+    }}
+  >
+    Save Changes
+  </button>
+);
   // Helper function for text offset calculation
   const getTextOffset = (rootNode, targetNode, targetOffset) => {
     const walker = document.createTreeWalker(
@@ -140,7 +168,8 @@ function TranslationPage() {
     
     setIsTranslating(true);
     setEditedText('');
-    setModifiedRanges([]); // Reset modification tracking
+    setTempModifiedRanges([]); 
+    // Reset modification tracking
     try {
       const response = await fetch('http://localhost:8000/api/translate', {
         method: 'POST',
@@ -186,63 +215,50 @@ function TranslationPage() {
           targetLanguage: selectedLanguage
         }),
       });
-
+  
       if (!response.ok) {
         throw new Error('Failed to get improvements');
       }
-
+  
       const data = await response.json();
+      // Clean up suggestions by removing numbering
+      const cleanSuggestions = data.suggestions.map(suggestion => 
+        suggestion.replace(/^\d+\.\s*/, '').trim()
+      );
+      
       setChatMessages(prev => [
         ...prev,
         { 
           role: 'assistant', 
           content: `Suggestions for "${selectedTranslatedText}":`,
-          suggestions: data.suggestions
+          suggestions: cleanSuggestions
         }
       ]);
     } catch (error) {
       console.error('Improvement error:', error);
     } finally {
       setIsImproving(false);
-      setShowFloatingToolbar(false);
     }
   };
 
   // Handle suggestion application
-  const handleApplySuggestion = (suggestion) => {
-    if (!selectedTranslatedText || selectedTextRange.start === selectedTextRange.end) {
-      return;
-    }
+  
 
-    const textBefore = translatedText.substring(0, selectedTextRange.start);
-    const textAfter = translatedText.substring(selectedTextRange.end);
-    const newText = textBefore + suggestion + textAfter;
-    
-    setTranslatedText(newText);
-    setModifiedRanges(prev => [...prev, {
-      start: selectedTextRange.start,
-      end: selectedTextRange.start + suggestion.length,
-      type: 'suggestion'
-    }]);
-
-    setSelectedTranslatedText('');
-    setSelectedTextRange({ start: 0, end: 0 });
-  };
+         
 
   // Handle editing save
   const handleSaveEdit = () => {
-    if (!selectedTextRange.start && !selectedTextRange.end) return;
-    
     const before = translatedText.substring(0, selectedTextRange.start);
     const after = translatedText.substring(selectedTextRange.end);
     const newText = before + editedText + after;
     
     setTranslatedText(newText);
-    setModifiedRanges(prev => [...prev, {
+    setTempModifiedRanges(prev => [...prev, {
       start: selectedTextRange.start,
       end: selectedTextRange.start + editedText.length,
       type: 'edit'
     }]);
+    setShowSaveButton(true);
     
     setIsEditing(false);
     setSelectedTranslatedText('');
@@ -251,26 +267,24 @@ function TranslationPage() {
 
   // Floating Toolbar Component
   const FloatingToolbar = () => showFloatingToolbar && (
-    <div
-      style={{
-        position: 'absolute',
-        top: `${toolbarPosition.top}px`,
-        left: `${toolbarPosition.left}px`,
-        transform: 'translateX(-50%)',
-        backgroundColor: 'white',
-        padding: '0.5rem',
-        borderRadius: '0.375rem',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-        display: 'flex',
-        gap: '0.5rem',
-        zIndex: 1000
-      }}
-    >
+    <div style={{
+      position: 'absolute',
+      top: `${toolbarPosition.top}px`,
+      left: `${toolbarPosition.left}px`,
+      transform: 'translateX(-50%)',
+      backgroundColor: 'white',
+      padding: '0.5rem',
+      borderRadius: '0.375rem',
+      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+      display: 'flex',
+      gap: '0.5rem',
+      zIndex: 1000
+    }}>
       <button
         onClick={() => {
-          setEditedText(selectedTranslatedText);
-          setIsEditing(true);
-          setShowFloatingToolbar(false);
+          setEditedText(selectedTranslatedText); // Set the text to edit
+          setIsEditing(true); // Show the edit modal
+          setShowFloatingToolbar(false); // Hide the toolbar
         }}
         style={{
           padding: '0.25rem 0.5rem',
@@ -285,25 +299,6 @@ function TranslationPage() {
       >
         <Edit2 size={14} />
         Edit
-      </button>
-      <button
-        onClick={() => {
-          handleImproveWithAI();
-          setShowFloatingToolbar(false);
-        }}
-        style={{
-          padding: '0.25rem 0.5rem',
-          backgroundColor: '#f3f4f6',
-          border: '1px solid #e5e7eb',
-          borderRadius: '0.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.25rem',
-          cursor: 'pointer'
-        }}
-      >
-        <Wand2 size={14} />
-        Improve
       </button>
     </div>
   );
@@ -432,7 +427,7 @@ function TranslationPage() {
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <div style={{ padding: '1rem' }}>
             {/* Modified Ranges Legend */}
-            {modifiedRanges.length > 0 && (
+            {tempModifiedRanges.length > 0 && (
               <div style={{ 
                 padding: '0.5rem', 
                 display: 'flex', 
@@ -477,20 +472,21 @@ function TranslationPage() {
               onMouseUp={handleTextSelection}
             >
               {translatedText.split('').map((char, index) => {
-                const modifiedRange = modifiedRanges.find(
-                  range => index >= range.start && index < range.end
-                );
-                
-                return (
-                  <span
-                    key={index}
-                    style={{
-                      backgroundColor: modifiedRange 
-                        ? modifiedRange.type === 'suggestion' 
-                          ? 'rgba(147, 197, 253, 0.3)'
-                          : 'rgba(110, 231, 183, 0.3)'
-                        : 'transparent'
-                    }}
+    const modifiedRange = tempModifiedRanges.find(
+      range => index >= range.start && index < range.end
+    );
+    
+    return (
+      <span
+        key={index}
+        style={{
+          backgroundColor: modifiedRange 
+            ? modifiedRange.type === 'suggestion' 
+              ? 'rgba(147, 197, 253, 0.3)' // Light blue for suggestions
+              : 'rgba(110, 231, 183, 0.3)'  // Light green for edits
+            : 'transparent',
+          padding: modifiedRange ? '0.1rem 0' : '0'
+        }}
                   >
                     {char}
                   </span>
@@ -609,11 +605,30 @@ function TranslationPage() {
                 <div>
                   <p style={{ marginBottom: '0.5rem' }}>Suggestions for improvement:</p>
                   {message.suggestions.map((suggestion, sugIndex) => (
-                    <div
-                      key={sugIndex}
-                      onMouseEnter={() => setHoveringSuggestion(sugIndex)}
-                      onMouseLeave={() => setHoveringSuggestion(null)}
-                      onClick={() => handleApplySuggestion(suggestion)}
+  <div
+    key={sugIndex}
+    onMouseEnter={() => setHoveringSuggestion(sugIndex)}
+    onMouseLeave={() => setHoveringSuggestion(null)}
+    onClick={() => {
+      if (!selectedTranslatedText || selectedTextRange.start === selectedTextRange.end) {
+        return;
+      }
+
+      const textBefore = translatedText.substring(0, selectedTextRange.start);
+      const textAfter = translatedText.substring(selectedTextRange.end);
+      const newText = textBefore + suggestion + textAfter;
+      
+      setTranslatedText(newText);
+      setTempModifiedRanges(prev => [...prev, {
+        start: selectedTextRange.start,
+        end: selectedTextRange.start + suggestion.length,
+        type: 'suggestion'
+      }]);
+      setShowSaveButton(true);
+
+      setSelectedTranslatedText('');
+      setSelectedTextRange({ start: 0, end: 0 });
+    }}
                       style={{
                         padding: '0.5rem',
                         margin: '0.25rem 0',
@@ -684,69 +699,74 @@ function TranslationPage() {
       </div>
 
       {/* Edit Modal */}
-      {isEditing && (
-        <div style={{ 
-          position: 'fixed', 
-          top: '50%', 
-          left: '50%', 
-          transform: 'translate(-50%, -50%)',
+      {/* Edit Modal */}
+{isEditing && (
+  <div style={{ 
+    position: 'fixed', 
+    top: '50%', 
+    left: '50%', 
+    transform: 'translate(-50%, -50%)',
+    backgroundColor: 'white',
+    padding: '1rem',
+    borderRadius: '0.5rem',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+    zIndex: 1000,
+    width: '90%',
+    maxWidth: '500px'
+  }}>
+    <textarea
+      value={editedText}
+      onChange={(e) => setEditedText(e.target.value)}
+      autoFocus // Add this to focus the textarea when modal opens
+      style={{
+        width: '100%',
+        minHeight: '100px',
+        padding: '0.5rem',
+        border: '1px solid #e5e7eb',
+        borderRadius: '0.375rem',
+        marginBottom: '1rem'
+      }}
+    />
+    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+      <button
+        onClick={handleSaveEdit}
+        style={{
+          backgroundColor: '#22c55e',
+          color: 'white',
+          padding: '0.5rem 1rem',
+          borderRadius: '0.375rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.25rem'
+        }}
+      >
+        <Check size={16} />
+        Save
+      </button>
+      <button
+        onClick={() => {
+          setIsEditing(false); // Close the modal
+          setEditedText(''); // Clear the edited text
+          setShowFloatingToolbar(false); // Hide the toolbar
+        }}
+        style={{
           backgroundColor: 'white',
-          padding: '1rem',
-          borderRadius: '0.5rem',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-          zIndex: 1000,
-          width: '90%',
-          maxWidth: '500px'
-        }}>
-          <textarea
-            value={editedText}
-            onChange={(e) => setEditedText(e.target.value)}
-            style={{
-              width: '100%',
-              minHeight: '100px',
-              padding: '0.5rem',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.375rem',
-              marginBottom: '1rem'
-            }}
-          />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-            <button
-              onClick={handleSaveEdit}
-              style={{
-                backgroundColor: '#22c55e',
-                color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.375rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}
-            >
-              <Check size={16} />
-              Save
-            </button>
-            <button
-              onClick={() => {
-                setIsEditing(false);
-                setEditedText('');
-              }}
-              style={{
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.375rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}
-            >
-              <X size={16} />
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+          border: '1px solid #e5e7eb',
+          padding: '0.5rem 1rem',
+          borderRadius: '0.375rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.25rem'
+        }}
+      >
+        <X size={16} />
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
+    
+      <SaveButton />
     </div>
   );
 }
