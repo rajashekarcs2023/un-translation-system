@@ -9,10 +9,21 @@ function TranslationPage() {
   const [chatMessages, setChatMessages] = useState([
     { role: 'assistant', content: 'Hi! I can help you improve your translation.' }
   ]);
-  const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('French');
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isImproving, setIsImproving] = useState(false);
+  const [selectedTextRange, setSelectedTextRange] = useState({ start: 0, end: 0 });
+  const [selectedTranslatedText, setSelectedTranslatedText] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [hoveringSuggestion, setHoveringSuggestion] = useState(null);
+
+  // Refs
+  const textRef = useRef(null);
+  const leftResizeRef = useRef(null);
+  const rightResizeRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const currentResizerRef = useRef(null);
 
   // UN Languages
   const unLanguages = [
@@ -26,12 +37,81 @@ function TranslationPage() {
   // Panel size states
   const [leftWidth, setLeftWidth] = useState(33);
   const [rightWidth, setRightWidth] = useState(33);
+  const middleWidth = 100 - leftWidth - rightWidth;
 
-  // Refs for resize handling
-  const leftResizeRef = useRef(null);
-  const rightResizeRef = useRef(null);
-  const isDraggingRef = useRef(false);
-  const currentResizerRef = useRef(null);
+  // Handle translation
+  const handleTranslate = async () => {
+    if (!sourceText.trim()) return;
+    
+    setIsTranslating(true);
+    setEditedText('');
+    try {
+      const response = await fetch('http://localhost:8000/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: sourceText,
+          source_language: 'English',
+          target_language: selectedLanguage
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Translation failed');
+      }
+
+      const data = await response.json();
+      setTranslatedText(data.translated_text);
+      setEditedText(data.translated_text);
+    } catch (error) {
+      console.error('Translation error:', error);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  // Handle AI improvements
+  const handleImproveWithAI = async () => {
+    if (!selectedTranslatedText) return;
+    
+    setIsImproving(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/improve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          originalText: sourceText,
+          translatedText: translatedText,
+          selectedText: selectedTranslatedText,
+          targetLanguage: selectedLanguage
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get improvements');
+      }
+
+      const data = await response.json();
+      const suggestions = data.suggestions.split('\n').filter(s => s.trim());
+      
+      setChatMessages(prev => [
+        ...prev,
+        { 
+          role: 'assistant', 
+          content: `Suggestions for "${selectedTranslatedText}":`,
+          suggestions: suggestions
+        }
+      ]);
+    } catch (error) {
+      console.error('Improvement error:', error);
+    } finally {
+      setIsImproving(false);
+    }
+  };
 
   // Resize handlers
   const handleMouseDown = (e, resizer) => {
@@ -60,41 +140,6 @@ function TranslationPage() {
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
   };
-
-  const handleTranslate = async () => {
-    if (!sourceText.trim()) return;
-    
-    setIsTranslating(true);
-    setEditedText(''); // Reset edited text
-    try {
-      const response = await fetch('http://localhost:8000/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: sourceText,
-          source_language: 'English',
-          target_language: selectedLanguage
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Translation failed');
-      }
-
-      const data = await response.json();
-      setTranslatedText(data.translated_text);
-      setEditedText(data.translated_text); // Initialize edited text with translation
-    } catch (error) {
-      console.error('Translation error:', error);
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
-  // Calculate middle panel width
-  const middleWidth = 100 - leftWidth - rightWidth;
 
   return (
     <div style={{ 
@@ -220,131 +265,38 @@ function TranslationPage() {
         </div>
 
         {/* Translation Content Area */}
-        <div style={{ 
-          display: 'flex',
-          flexDirection: 'column',
-          flex: 1,
-          overflowY: 'auto'
-        }}>
-          {/* Translation Display */}
-          <div style={{ 
-            padding: '1rem',
-            borderBottom: isEditing ? '1px solid #e5e7eb' : 'none'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '0.5rem'
-            }}>
-              <span style={{ fontSize: '0.875rem', color: '#666' }}>
-                {isEditing ? 'Original Translation' : 'Translation'}
-              </span>
-              {!isEditing && translatedText && (
-                <button
-                  onClick={() => {
-                    setEditedText(translatedText);  // Initialize edit area with current translation
-                    setIsEditing(true);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem',
-                    backgroundColor: '#f3f4f6',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.375rem',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem'
-                  }}
-                >
-                  <Edit2 size={16} />
-                  Edit
-                </button>
-              )}
-            </div>
-            <div style={{
-              padding: '1rem',
-              backgroundColor: '#f9fafb',
-              borderRadius: '0.375rem',
-              minHeight: '100px'
-            }}>
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ padding: '1rem' }}>
+            <div 
+              ref={textRef}
+              style={{
+                padding: '1rem',
+                backgroundColor: '#f9fafb',
+                borderRadius: '0.375rem',
+                minHeight: '100px',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word'
+              }}
+              onMouseUp={() => {
+                const selection = window.getSelection();
+                const selectedText = selection.toString().trim();
+                if (selectedText && textRef.current) {
+                  const range = selection.getRangeAt(0);
+                  const preCaretRange = range.cloneRange();
+                  preCaretRange.selectNodeContents(textRef.current);
+                  preCaretRange.setEnd(range.startContainer, range.startOffset);
+                  const start = preCaretRange.toString().length;
+                  setSelectedTextRange({
+                    start,
+                    end: start + selectedText.length
+                  });
+                  setSelectedTranslatedText(selectedText);
+                }
+              }}
+            >
               {translatedText || "Translation will appear here"}
             </div>
           </div>
-
-          {/* Edit Area */}
-          {isEditing && (
-            <div style={{ padding: '1rem', flex: 1 }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                marginBottom: '0.5rem'
-              }}>
-                <span style={{ fontSize: '0.875rem', color: '#666' }}>
-                  Edit Translation
-                </span>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    onClick={() => {
-                      setTranslatedText(editedText);
-                      setIsEditing(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem',
-                      backgroundColor: '#22c55e',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    <Check size={16} />
-                    Save
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditedText(translatedText);
-                      setIsEditing(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem',
-                      backgroundColor: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '0.375rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    <X size={16} />
-                    Cancel
-                  </button>
-                </div>
-              </div>
-              <textarea
-                value={editedText}
-                onChange={(e) => setEditedText(e.target.value)}
-                style={{
-                  width: '100%',
-                  minHeight: '150px',
-                  padding: '1rem',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '0.375rem',
-                  resize: 'vertical',
-                  fontSize: '1rem',
-                  lineHeight: '1.5'
-                }}
-              />
-            </div>
-          )}
         </div>
 
         {/* Bottom Controls */}
@@ -354,15 +306,31 @@ function TranslationPage() {
             gap: '0.5rem',
             justifyContent: 'space-between' 
           }}>
-            <button style={{
-              flex: 1,
-              padding: '0.5rem',
-              backgroundColor: '#f3f4f6',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.375rem',
-              cursor: 'pointer'
-            }}>
-              Improve with AI
+            <button 
+              onClick={handleImproveWithAI}
+              disabled={!selectedTranslatedText || isImproving}
+              style={{
+                flex: 1,
+                padding: '0.5rem',
+                backgroundColor: '#f3f4f6',
+                border: '1px solid #e5e7eb',
+                borderRadius: '0.375rem',
+                cursor: !selectedTranslatedText || isImproving ? 'not-allowed' : 'pointer',
+                opacity: !selectedTranslatedText || isImproving ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              {isImproving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600" />
+                  Improving...
+                </>
+              ) : (
+                'Improve with AI'
+              )}
             </button>
             <button style={{
               flex: 1,
@@ -388,8 +356,6 @@ function TranslationPage() {
         </div>
       </div>
 
-      {/* Right Panel code remains the same */}
-      {/* ... */}
       {/* Right Resize Handle */}
       <div
         ref={rightResizeRef}
@@ -400,10 +366,7 @@ function TranslationPage() {
           backgroundColor: '#f3f4f6',
           position: 'relative',
           zIndex: 10,
-          transition: 'background-color 0.2s',
-          '&:hover': {
-            backgroundColor: '#e5e7eb'
-          }
+          transition: 'background-color 0.2s'
         }}
       />
 
@@ -440,7 +403,48 @@ function TranslationPage() {
                 color: message.role === 'user' ? 'white' : 'black',
               }}
             >
-              {message.content}
+              {message.role === 'assistant' && message.suggestions ? (
+                <div>
+                  <p style={{ marginBottom: '0.5rem' }}>Suggestions for improvement:</p>
+                  {message.suggestions.map((suggestion, sugIndex) => (
+                    <div
+                      key={sugIndex}
+                      onMouseEnter={() => setHoveringSuggestion(sugIndex)}
+                      onMouseLeave={() => setHoveringSuggestion(null)}
+                      onClick={() => {
+                        const before = translatedText.slice(0, selectedTextRange.start);
+                        const after = translatedText.slice(selectedTextRange.end);
+                        setTranslatedText(before + suggestion + after);
+                        setSelectedTranslatedText('');
+                        setSelectedTextRange({ start: 0, end: 0 });
+                      }}
+                      style={{
+                        padding: '0.5rem',
+                        margin: '0.25rem 0',
+                        backgroundColor: 'white',
+                        borderRadius: '0.375rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <span>{suggestion}</span>
+                      {hoveringSuggestion === sugIndex && (
+                        <span style={{ 
+                          color: '#22c55e', 
+                          marginLeft: '0.5rem',
+                          fontSize: '1.25rem' 
+                        }}>
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                message.content
+              )}
             </div>
           ))}
         </div>
@@ -484,7 +488,6 @@ function TranslationPage() {
           </div>
         </div>
       </div>
-
     </div>
   );
 }
