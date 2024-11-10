@@ -11,6 +11,10 @@ The project is divided into three primary sections:
 3. **AI Agents**: Autonomous modules within the backend, each dedicated to a specific task within the translation workflow to ensure high-quality, standardized output.
 
 ---
+# un-translation-system
+<img width="456" alt="Screenshot 2024-11-10 at 3 24 39 PM" src="https://github.com/user-attachments/assets/35fc8618-fb1c-4200-92c5-f0f27ab673be">
+
+![image](https://github.com/user-attachments/assets/cb0e6b9a-d8d6-4843-bf44-02c1e29380b1)
 
 ## Backend (FastAPI)
 
@@ -138,7 +142,3 @@ The React-based frontend provides users with a streamlined, accessible interface
 This project is licensed under the MIT License.
 
 Translate4Good combines the power of FastAPI and React to create an efficient and accurate translation system tailored for the UNCCD's complex requirements. This tool not only provides high-quality translations but also helps streamline workflows for UN translators, ultimately enhancing their ability to manage vast amounts of content across multiple languages.
-# un-translation-system
-<img width="456" alt="Screenshot 2024-11-10 at 3 24 39 PM" src="https://github.com/user-attachments/assets/35fc8618-fb1c-4200-92c5-f0f27ab673be">
-
-![image](https://github.com/user-attachments/assets/cb0e6b9a-d8d6-4843-bf44-02c1e29380b1)
