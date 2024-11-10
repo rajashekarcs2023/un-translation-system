@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send } from 'lucide-react';
+
+import { Send, Edit2, Check, X } from 'lucide-react';
 
 function TranslationPage() {
   const [sourceText, setSourceText] = useState('');
@@ -8,6 +9,8 @@ function TranslationPage() {
   const [chatMessages, setChatMessages] = useState([
     { role: 'assistant', content: 'Hi! I can help you improve your translation.' }
   ]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedText, setEditedText] = useState('');
 
   // Panel size states (in percentages)
   const [leftWidth, setLeftWidth] = useState(33);
@@ -112,89 +115,210 @@ function TranslationPage() {
       />
 
       {/* Middle Panel */}
-      <div style={{ 
-        width: `${middleWidth}%`,
-        minWidth: '20%',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: 'white'
+      {/* Middle Panel */}
+<div style={{ 
+  width: `${middleWidth}%`,
+  minWidth: '20%',
+  display: 'flex',
+  flexDirection: 'column',
+  backgroundColor: 'white'
+}}>
+  {/* Header */}
+  <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
+    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+      <select style={{ 
+        flex: 1,
+        padding: '0.5rem',
+        border: '1px solid #e5e7eb',
+        borderRadius: '0.375rem'
       }}>
-        <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <select style={{ 
-              flex: 1,
-              padding: '0.5rem',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.375rem'
-            }}>
-              <option>English → French</option>
-              <option>English → Spanish</option>
-              <option>English → Arabic</option>
-            </select>
-            <button style={{
-              backgroundColor: '#2563eb',
-              color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.375rem',
-              border: 'none',
-              cursor: 'pointer'
-            }}>
-              Translate
-            </button>
-          </div>
-        </div>
-        
-        <div style={{ padding: '1rem', flex: 1, overflowY: 'auto' }}>
-          {translatedText || (
-            <div style={{ 
-              textAlign: 'center', 
-              color: '#666', 
-              marginTop: '2rem' 
-            }}>
-              Translation will appear here
-            </div>
-          )}
-        </div>
+        <option>English → French</option>
+        <option>English → Spanish</option>
+        <option>English → Arabic</option>
+      </select>
+      <button 
+        onClick={() => {
+          setTranslatedText("This is a sample translated text. Click edit to modify."); // Replace with actual translation
+        }}
+        style={{
+          backgroundColor: '#2563eb',
+          color: 'white',
+          padding: '0.5rem 1rem',
+          borderRadius: '0.375rem',
+          border: 'none',
+          cursor: 'pointer'
+        }}
+      >
+        Translate
+      </button>
+    </div>
+  </div>
 
-        <div style={{ padding: '1rem', borderTop: '1px solid #e5e7eb' }}>
-          <div style={{ 
-            display: 'flex', 
-            gap: '0.5rem',
-            justifyContent: 'space-between' 
-          }}>
-            <button style={{
-              flex: 1,
+  {/* Content Area */}
+  <div style={{ 
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    overflowY: 'auto'
+  }}>
+    {/* Original Translation */}
+    <div style={{ 
+      padding: '1rem',
+      borderBottom: isEditing ? '1px solid #e5e7eb' : 'none'
+    }}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '0.5rem'
+      }}>
+        <span style={{ fontSize: '0.875rem', color: '#666' }}>
+          {isEditing ? 'Original Translation' : 'Translation'}
+        </span>
+        {!isEditing && translatedText && (
+          <button
+            onClick={() => setIsEditing(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
               padding: '0.5rem',
               backgroundColor: '#f3f4f6',
               border: '1px solid #e5e7eb',
               borderRadius: '0.375rem',
-              cursor: 'pointer'
-            }}>
-              Improve with AI
+              cursor: 'pointer',
+              fontSize: '0.875rem'
+            }}
+          >
+            <Edit2 size={16} />
+            Edit
+          </button>
+        )}
+      </div>
+      <div style={{
+        padding: '1rem',
+        backgroundColor: '#f9fafb',
+        borderRadius: '0.375rem',
+        minHeight: '100px'
+      }}>
+        {translatedText || "Translation will appear here"}
+      </div>
+    </div>
+
+    {/* Edit Area */}
+    {isEditing && (
+      <div style={{ padding: '1rem', flex: 1 }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '0.5rem'
+        }}>
+          <span style={{ fontSize: '0.875rem', color: '#666' }}>
+            Edit Translation
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={() => {
+                setTranslatedText(editedText);
+                setIsEditing(false);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem',
+                backgroundColor: '#22c55e',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              <Check size={16} />
+              Save
             </button>
-            <button style={{
-              flex: 1,
-              padding: '0.5rem',
-              backgroundColor: '#f3f4f6',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.375rem',
-              cursor: 'pointer'
-            }}>
-              Highlight Terms
-            </button>
-            <button style={{
-              flex: 1,
-              padding: '0.5rem',
-              backgroundColor: '#f3f4f6',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.375rem',
-              cursor: 'pointer'
-            }}>
-              Glossary
+            <button
+              onClick={() => {
+                setEditedText(translatedText);
+                setIsEditing(false);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem',
+                backgroundColor: 'white',
+                border: '1px solid #e5e7eb',
+                borderRadius: '0.375rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              <X size={16} />
+              Cancel
             </button>
           </div>
         </div>
+        <textarea
+          value={editedText}
+          onChange={(e) => setEditedText(e.target.value)}
+          style={{
+            width: '100%',
+            minHeight: '150px',
+            padding: '1rem',
+            border: '1px solid #e5e7eb',
+            borderRadius: '0.375rem',
+            resize: 'vertical',
+            fontSize: '1rem',
+            lineHeight: '1.5'
+          }}
+        />
       </div>
+    )}
+  </div>
+
+  {/* Bottom Controls */}
+  <div style={{ padding: '1rem', borderTop: '1px solid #e5e7eb' }}>
+    <div style={{ 
+      display: 'flex', 
+      gap: '0.5rem',
+      justifyContent: 'space-between' 
+    }}>
+      <button style={{
+        flex: 1,
+        padding: '0.5rem',
+        backgroundColor: '#f3f4f6',
+        border: '1px solid #e5e7eb',
+        borderRadius: '0.375rem',
+        cursor: 'pointer'
+      }}>
+        Improve with AI
+      </button>
+      <button style={{
+        flex: 1,
+        padding: '0.5rem',
+        backgroundColor: '#f3f4f6',
+        border: '1px solid #e5e7eb',
+        borderRadius: '0.375rem',
+        cursor: 'pointer'
+      }}>
+        Highlight Terms
+      </button>
+      <button style={{
+        flex: 1,
+        padding: '0.5rem',
+        backgroundColor: '#f3f4f6',
+        border: '1px solid #e5e7eb',
+        borderRadius: '0.375rem',
+        cursor: 'pointer'
+      }}>
+        Glossary
+      </button>
+    </div>
+  </div>
+</div>
 
       {/* Right Resize Handle */}
       <div
