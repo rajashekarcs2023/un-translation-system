@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Edit2, Upload, Check, X, Wand2 } from 'lucide-react';
+import { Send, Edit2, Upload, Check, X, Wand2,Highlighter  } from 'lucide-react';
 
 // Add this colors object right after the imports
 const colors = {
@@ -39,7 +39,108 @@ function TranslationPage() {
   const [showCopyNotification, setShowCopyNotification] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState('');
+  // Add these near your other state variables
+  // Add this with your other state variables at the top
+  const [highlightedText, setHighlightedText] = useState('');
+  const [isHighlighting, setIsHighlighting] = useState(false);
+  // Add after your state declarations and before handlers
+const renderText = () => {
+  if (!highlightedText) {
+    // Show normal text with modifications
+    return translatedText.split('').map((char, index) => {
+      const modifiedRange = tempModifiedRanges.find(
+        range => index >= range.start && index < range.end
+      );
+      
+      return (
+        <span
+          key={index}
+          style={{
+            backgroundColor: modifiedRange 
+              ? modifiedRange.type === 'suggestion' 
+                ? 'rgba(147, 112, 219, 0.3)'
+                : 'rgba(110, 231, 183, 0.3)'
+              : 'transparent',
+            padding: modifiedRange ? '0.1rem 0' : '0'
+          }}
+        >
+          {char}
+        </span>
+      );
+    });
+  }
+
+  // Show highlighted text
+  return highlightedText.split(/(\[\[.*?\]\])/g).map((part, index) => {
+    if (part.startsWith('[[') && part.endsWith(']]')) {
+      // This is a technical term
+      return (
+        <span
+          key={index}
+          style={{
+            backgroundColor: 'rgba(255, 255, 0, 0.3)',
+            padding: '0 2px',
+            borderRadius: '2px'
+          }}
+        >
+          {part.slice(2, -2)} {/* Remove the [[ and ]] */}
+        </span>
+      );
+    }
+    // Regular text
+    return part;
+  });
+};
   // Add after your state declarations
+
+  // Add this with your other handler functions
+const handleHighlight = async () => {
+  if (!translatedText) return;
+  
+  setIsHighlighting(true);
+  try {
+    const response = await fetch('http://localhost:8000/api/highlight-terms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: translatedText })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to highlight terms');
+    }
+    
+    const data = await response.json();
+    setHighlightedText(data.highlighted_text);
+  } catch (error) {
+    console.error('Highlight error:', error);
+    alert('Failed to highlight terms');
+  } finally {
+    setIsHighlighting(false);
+  }
+};
+  
+  // Add this function to handle term clicks
+  const handleTermClick = async (term) => {
+    setSelectedTerm(term);
+    try {
+      const response = await fetch('http://localhost:8000/api/suggest-alternatives', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ term })
+      });
+  
+      if (!response.ok) throw new Error('Failed to get alternatives');
+      
+      const data = await response.json();
+      setAlternatives(data.alternatives);
+    } catch (error) {
+      console.error('Alternative terms error:', error);
+    }
+  };
   const handleFileUpload = async (file) => {
     if (!file) return;
     
@@ -105,6 +206,9 @@ const Header = () => (
       showFloatingToolbar
     });
   }, [isEditing, editedText, selectedTranslatedText, showFloatingToolbar]);
+  useEffect(() => {
+    setHighlightedText(''); // Clear highlights when text changes
+  }, [translatedText]);
 
   // Refs
   const textRef = useRef(null);
@@ -254,6 +358,45 @@ const SaveButton = () => showSaveButton && (
   };
 
   // Resize handlers
+  // Add this handler function near your other handlers
+const handleSendMessage = async () => {
+  if (!prompt.trim()) return;
+
+  const userMessage = { role: 'user', content: prompt };
+  setChatMessages(prev => [...prev, userMessage]);
+  setPrompt('');
+
+  try {
+    const response = await fetch('http://localhost:8000/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: prompt,
+        translatedText: translatedText,
+        context: chatMessages.slice(-5) // Last 5 messages for context
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get response');
+    }
+
+    const data = await response.json();
+    setChatMessages(prev => [...prev, {
+      role: 'assistant',
+      content: data.message
+    }]);
+
+  } catch (error) {
+    console.error('Chat error:', error);
+    setChatMessages(prev => [...prev, {
+      role: 'assistant',
+      content: 'Sorry, I encountered an error. Please try again.'
+    }]);
+  }
+};
   const handleMouseDown = (e, resizer) => {
     isDraggingRef.current = true;
     currentResizerRef.current = resizer;
@@ -466,6 +609,9 @@ const SaveButton = () => showSaveButton && (
       // Focus textarea
       textarea.focus();
     };
+    // Add this function before the return statement
+    // Add this function before the return statement
+
   
     return (
       <div
@@ -732,20 +878,18 @@ return (
               onClick={handleTranslate}
               disabled={!sourceText.trim() || isTranslating}
               style={{
-                backgroundColor: isTranslating ? '#93c5fd' : '#2563eb',
+                flex: 1,
+                padding: '0.5rem',
+                backgroundColor: colors.primary, // UN Blue
                 color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.375rem',
                 border: 'none',
-                cursor: isTranslating ? 'not-allowed' : 'pointer',
-                opacity: !sourceText.trim() ? 0.5 : 1,
+                borderRadius: '0.375rem',
+                cursor: !sourceText || isTranslating ? 'not-allowed' : 'pointer',
+                opacity: !sourceText || isTranslating ? 0.5 : 1,
                 display: 'flex',
                 alignItems: 'center',
-              gap: '0.5rem',
-              minWidth: '100px',
-              justifyContent: 'center',
-              fontSize: '0.875rem',
-              fontWeight: 500
+                justifyContent: 'center',
+                gap: '0.5rem'
               }}
             >
               {isTranslating ? (
@@ -777,7 +921,7 @@ return (
                   <span style={{ 
                     width: '12px', 
                     height: '12px', 
-                    backgroundColor: 'rgba(147, 197, 253, 0.3)',
+                    backgroundColor: 'rgba(147, 112, 219, 0.3)',
                     borderRadius: '2px'
                   }} />
                   AI Suggestions
@@ -794,7 +938,7 @@ return (
               </div>
             )}
 
-            {/* Translation Text Display */}
+   {/* Translation Text Display */}
 <div 
   ref={textRef}
   style={{
@@ -807,39 +951,39 @@ return (
     wordBreak: 'break-word',
     userSelect: 'text',
     cursor: 'text',
-    lineHeight: '1.5'  // Added for better readability
+    lineHeight: '1.5'
   }}
   onMouseUp={handleTextSelection}
   onBlur={(e) => {
-    // Only hide toolbar if we're not clicking inside it
     if (!e.relatedTarget?.closest('.toolbar-button')) {
       setTimeout(() => setShowFloatingToolbar(false), 200);
     }
   }}
 >
-  {translatedText.split('').map((char, index) => {
-    const modifiedRange = tempModifiedRanges.find(
-      range => index >= range.start && index < range.end
-    );
-    
-    return (
-      <span
-        key={index}
-        style={{
-          backgroundColor: modifiedRange 
-            ? modifiedRange.type === 'suggestion' 
-              ? 'rgba(147, 197, 253, 0.3)' 
-              : 'rgba(110, 231, 183, 0.3)'
-            : 'transparent',
-          padding: modifiedRange ? '0.1rem 0' : '0'
-        }}
-      >
-        {char}
-      </span>
-    );
-  })}
+  {isEditing ? (
+    <textarea
+      value={editedText}
+      onChange={(e) => setEditedText(e.target.value)}
+      style={{
+        width: '100%',
+        height: '100%',
+        padding: '0',
+        border: 'none',
+        backgroundColor: 'transparent',
+        resize: 'none',
+        outline: 'none',
+        fontFamily: 'inherit',
+        fontSize: 'inherit',
+        lineHeight: 'inherit'
+      }}
+      autoFocus
+    />
+  ) : (
+    renderText()
+  )}
   <FloatingToolbar />
 </div>
+
             
           </div>
         </div>
@@ -877,6 +1021,36 @@ return (
                 'Improve with AI'
               )}
             </button>
+            
+<button 
+  onClick={handleHighlight}  // Add this onClick handler
+  disabled={!translatedText || isTranslating}  // Add this disabled state
+  style={{
+    flex: 1,
+    padding: '0.5rem',
+    backgroundColor: '#f3f4f6',
+    border: '1px solid #e5e7eb',
+    borderRadius: '0.375rem',
+    cursor: !translatedText || isTranslating ? 'not-allowed' : 'pointer',
+    opacity: !translatedText || isTranslating ? 0.5 : 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem'
+  }}
+>
+  {isTranslating ? (
+    <>
+      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600" />
+      Highlighting...
+    </>
+  ) : (
+    <>
+      <Highlighter size={16} />
+      Highlight Terms
+    </>
+  )}
+</button>
             <button style={{
               flex: 1,
               padding: '0.5rem',
@@ -885,17 +1059,7 @@ return (
               borderRadius: '0.375rem',
               cursor: 'pointer'
             }}>
-              Highlight Terms
-            </button>
-            <button style={{
-              flex: 1,
-              padding: '0.5rem',
-              backgroundColor: '#f3f4f6',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.375rem',
-              cursor: 'pointer'
-            }}>
-              Glossary
+              Export
             </button>
           </div>
         </div>
@@ -984,13 +1148,17 @@ return (
                         cursor: 'pointer',
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        border: '1px solid #e5e7eb',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: hoveringSuggestion === sugIndex ? '#E6F4FA' : 'white', // Light purple on hover
+                        borderColor: hoveringSuggestion === sugIndex ? colors.primary : '#e5e7eb', // Purple border on hover
                       }}
                     >
                       <span>{suggestion}</span>
                       {hoveringSuggestion === sugIndex && (
                         <span style={{ 
-                          color: '#22c55e', 
+                          color: colors.primary,  // Purple checkmark
                           marginLeft: '0.5rem',
                           fontSize: '1.25rem' 
                         }}>✓</span>
@@ -1015,28 +1183,44 @@ return (
             gap: '0.5rem' 
           }}>
             <input
-              type="text"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Ask me anything about the translation..."
-              style={{
-                flex: 1,
-                padding: '0.75rem',
-                border: '1px solid #e5e7eb',
-                borderRadius: '0.375rem'
-              }}
+      type="text"
+      value={prompt}
+      onChange={(e) => setPrompt(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSendMessage();
+        }
+      }}
+      placeholder="Ask me anything about the translation..."
+      style={{
+        flex: 1,
+        padding: '0.75rem',
+        border: '1px solid #e5e7eb',
+        borderRadius: '0.375rem',
+        outline: 'none',
+        ':focus': {
+          borderColor: colors.primary
+        }
+      }}
             />
             <button
+            onClick={handleSendMessage}  
+            disabled={!prompt.trim()}
               style={{
                 padding: '0.75rem',
-                backgroundColor: '#2563eb',
+                backgroundColor: colors.primary, // UN Blue
                 color: 'white',
                 border: 'none',
                 borderRadius: '0.375rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                transition: 'background-color 0.2s',
+                ':hover': {
+                  backgroundColor: '#0082B3' // Slightly darker blue on hover
+                }
               }}
             >
               <Send size={16} />
