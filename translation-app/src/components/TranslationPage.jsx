@@ -550,7 +550,7 @@ const handleSendMessage = async () => {
       saveButton.textContent = 'Save';
       saveButton.style.cssText = `
         padding: 6px 12px;
-        background: #2563eb;
+        background: ${colors.primary};
         color: white;
         border: none;
         border-radius: 4px;
@@ -562,7 +562,7 @@ const handleSendMessage = async () => {
       cancelButton.textContent = 'Cancel';
       cancelButton.style.cssText = `
         padding: 6px 12px;
-        background: #ef4444;
+        background: ${colors.primary};
         color: white;
         border: none;
         border-radius: 4px;
@@ -1108,7 +1108,7 @@ return (
                 maxWidth: '80%',
                 padding: '0.75rem',
                 borderRadius: '0.75rem',
-                backgroundColor: message.role === 'user' ? '#2563eb' : '#f3f4f6',
+                backgroundColor: message.role === 'user' ? colors.primary : '#f3f4f6',
                 color: message.role === 'user' ? 'white' : 'black',
               }}
             >
