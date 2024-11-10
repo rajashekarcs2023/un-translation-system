@@ -1,18 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Edit2, Check, X, Wand2 } from 'lucide-react';
 
-// Add this colors object right after the imports
-const colors = {
-  primary: '#009EDB', // UN Blue
-  secondary: '#1A365D', // Darker blue for headers
-  accent: '#00B398', // UN Teal
-  neutral: {
-    light: '#F8FAFC',
-    medium: '#E2E8F0',
-    dark: '#475569'
-  }
-};
-
 function TranslationPage() {
   // All state variables
   const [sourceText, setSourceText] = useState('');
@@ -37,25 +25,6 @@ function TranslationPage() {
   const [tempModifiedRanges, setTempModifiedRanges] = useState([]);
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [showCopyNotification, setShowCopyNotification] = useState(false);
-  // Add after your state declarations
-const Header = () => (
-  <header style={{
-    backgroundColor: colors.primary,
-    padding: '1rem',
-    color: 'white',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-  }}>
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '1rem',
-      maxWidth: '1400px',
-      margin: '0 auto'
-    }}>
-      <h1 style={{ margin: 0, fontSize: '1.5rem' }}>UN Document Translation</h1>
-    </div>
-  </header>
-);
   // Add this right after your state declarations
   useEffect(() => {
     console.log({
@@ -139,11 +108,10 @@ const Header = () => (
   };
   // Text selection handler
   const handleTextSelection = () => {
-    console.log('Text selection triggered');
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
     
-    console.log('Selected text:', selectedText);
+    console.log("Text selected:", selectedText); // Debug log
     
     if (selectedText && textRef.current) {
       const range = selection.getRangeAt(0);
@@ -154,7 +122,7 @@ const Header = () => (
       const start = getTextOffset(textRef.current, range.startContainer, range.startOffset);
       const end = start + selectedText.length;
   
-      console.log('Selection range:', { start, end });
+      console.log("Selection range:", { start, end }); // Debug log
   
       // Update selection states
       setSelectedTextRange({ start, end });
@@ -166,8 +134,14 @@ const Header = () => (
         left: rect.left + (rect.width / 2) - containerRect.left
       });
       setShowFloatingToolbar(true);
+      console.log("Showing floating toolbar"); // Debug log
+    } else {
+      setShowFloatingToolbar(false);
+      setSelectedTranslatedText('');
+      setSelectedTextRange({ start: 0, end: 0 });
     }
   };
+  // Add these states at the top
 
 
 // Add this component for the save button
@@ -319,117 +293,127 @@ const SaveButton = () => showSaveButton && (
     }
   };
 
-  //
+  // Handle suggestion application
+  
+
+         
+
+  // Handle editing save
+  const handleSaveEdit = () => {
+    // Get parts of the text before and after the selected range
+    const before = translatedText.substring(0, selectedTextRange.start);
+    const after = translatedText.substring(selectedTextRange.end);
+    
+    // Replace the selected text with the edited text
+    const newText = before + editedText + after;
+  
+    setTranslatedText(newText); // Update the translated text with the new changes
+  
+    // Track the edited range
+    setTempModifiedRanges(prev => [
+      ...prev,
+      {
+        start: selectedTextRange.start,
+        end: selectedTextRange.start + editedText.length,
+        type: 'edit'
+      }
+    ]);
+    
+    // Show the save button for finalizing changes
+    setShowSaveButton(true);
+  
+    // Reset editing state
+    setIsEditing(false);
+    setSelectedTranslatedText('');
+    setSelectedTextRange({ start: 0, end: 0 });
+  };
+  
+
+  // Floating Toolbar Component
+  // Modify your FloatingToolbar component
   const FloatingToolbar = () => {
     if (!showFloatingToolbar) return null;
   
+    const handleCopy = async () => {
+      try {
+        await navigator.clipboard.writeText(selectedTranslatedText);
+        // Optional: Show a small success message or tooltip
+        console.log('Text copied successfully');
+      } catch (err) {
+        console.error('Failed to copy text:', err);
+      }
+    };
+  
     const handleEditClick = () => {
-      // Create modal container
-      const modalContainer = document.createElement('div');
-      modalContainer.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        z-index: 2000;
-        width: 400px;
-      `;
+      // We'll implement a simpler inline editing approach
+      const textElement = textRef.current;
+      if (!textElement) return;
   
-      // Create textarea
-      const textarea = document.createElement('textarea');
-      textarea.value = selectedTranslatedText;
-      textarea.style.cssText = `
-        width: 100%;
-        min-height: 100px;
-        padding: 8px;
-        margin: 10px 0;
-        border: 1px solid #e5e7eb;
-        border-radius: 4px;
-        font-family: inherit;
-        font-size: 14px;
-      `;
+      const startText = translatedText.substring(0, selectedTextRange.start);
+      const endText = translatedText.substring(selectedTextRange.end);
   
-      // Create buttons container
-      const buttonsContainer = document.createElement('div');
-      buttonsContainer.style.cssText = `
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-top: 10px;
-      `;
+      // Create and insert an input field at the selection point
+      const editContainer = document.createElement('span');
+      editContainer.style.display = 'inline-block';
+      editContainer.style.minWidth = '20px';
+      editContainer.style.position = 'relative';
   
-      // Create save button
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = selectedTranslatedText;
+      input.style.width = '100%';
+      input.style.border = '1px solid #2563eb';
+      input.style.borderRadius = '4px';
+      input.style.padding = '2px 4px';
+      input.style.fontSize = 'inherit';
+      input.style.fontFamily = 'inherit';
+      input.style.backgroundColor = '#fff';
+  
       const saveButton = document.createElement('button');
-      saveButton.textContent = 'Save';
-      saveButton.style.cssText = `
-        padding: 6px 12px;
-        background: #2563eb;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      `;
+      saveButton.textContent = '✓';
+      saveButton.style.position = 'absolute';
+      saveButton.style.right = '-25px';
+      saveButton.style.top = '50%';
+      saveButton.style.transform = 'translateY(-50%)';
+      saveButton.style.backgroundColor = '#22c55e';
+      saveButton.style.color = 'white';
+      saveButton.style.border = 'none';
+      saveButton.style.borderRadius = '4px';
+      saveButton.style.padding = '2px 6px';
+      saveButton.style.cursor = 'pointer';
   
-      // Create cancel button
-      const cancelButton = document.createElement('button');
-      cancelButton.textContent = 'Cancel';
-      cancelButton.style.cssText = `
-        padding: 6px 12px;
-        background: #ef4444;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      `;
-  
-      // Add event listeners
       saveButton.onclick = () => {
-        const newText = textarea.value;
-        if (newText !== selectedTranslatedText) {
-          const textBefore = translatedText.substring(0, selectedTextRange.start);
-          const textAfter = translatedText.substring(selectedTextRange.end);
-          const updatedText = textBefore + newText + textAfter;
-          
-          setTranslatedText(updatedText);
-          setTempModifiedRanges(prev => [
-            ...prev,
-            {
-              start: selectedTextRange.start,
-              end: selectedTextRange.start + newText.length,
-              type: 'edit'
-            }
-          ]);
-          setShowSaveButton(true);
-        }
-        document.body.removeChild(modalContainer);
-        setShowFloatingToolbar(false);
+        const newText = startText + input.value + endText;
+        setTranslatedText(newText);
+        setTempModifiedRanges(prev => [
+          ...prev,
+          {
+            start: selectedTextRange.start,
+            end: selectedTextRange.start + input.value.length,
+            type: 'edit'
+          }
+        ]);
+        setShowSaveButton(true);
+        editContainer.replaceWith(input.value);
       };
   
-      cancelButton.onclick = () => {
-        document.body.removeChild(modalContainer);
-        setShowFloatingToolbar(false);
-      };
+      editContainer.appendChild(input);
+      editContainer.appendChild(saveButton);
   
-      // Assemble the modal
-      buttonsContainer.appendChild(cancelButton);
-      buttonsContainer.appendChild(saveButton);
-      modalContainer.appendChild(textarea);
-      modalContainer.appendChild(buttonsContainer);
+      // Replace the selected text with the input field
+      const range = window.getSelection().getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(editContainer);
   
-      // Add modal to body
-      document.body.appendChild(modalContainer);
+      // Focus the input and select its contents
+      input.focus();
+      input.select();
   
-      // Focus textarea
-      textarea.focus();
+      setShowFloatingToolbar(false);
     };
   
     return (
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           position: 'absolute',
           top: `${toolbarPosition.top}px`,
@@ -496,12 +480,7 @@ const SaveButton = () => showSaveButton && (
       </div>
     );
   };
-// Remove handleSaveEdit function as it's no longer needed
-
-// ... rest of the code remains the same ...
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-    <Header />
     <div style={{ 
       display: 'flex', 
       height: '100vh', 
@@ -512,17 +491,16 @@ const SaveButton = () => showSaveButton && (
     }}>
       {/* Left Panel */}
       <div style={{ 
-  width: `${leftWidth}%`,
-  minWidth: '15%',
-  maxWidth: '70%',
-  borderRight: `1px solid ${colors.neutral.medium}`,
-  display: 'flex',
-  flexDirection: 'column',
-  backgroundColor: colors.neutral.light,
-  boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-}}>
-        <div style={{ padding: '1rem', borderBottom: `1px solid ${colors.neutral.medium}`,backgroundColor: 'white' }}>
-          <h2 style={{ margin: 0, marginBottom: '0.5rem',color: colors.secondary,fontSize: '1.25rem' }}>Original Text</h2>
+        width: `${leftWidth}%`,
+        minWidth: '15%',
+        maxWidth: '70%',
+        borderRight: '1px solid #e5e7eb',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: 'white'
+      }}>
+        <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
+          <h2 style={{ margin: 0, marginBottom: '0.5rem' }}>Original Text</h2>
         </div>
         <div style={{ padding: '1rem', flex: 1, overflow: 'hidden' }}>
           <textarea
@@ -585,13 +563,8 @@ const SaveButton = () => showSaveButton && (
                 style={{ 
                   flex: 1,
                   padding: '0.5rem',
-                  border: `1px solid ${colors.neutral.medium}`,
-                  borderRadius: '0.375rem',
-                  backgroundColor: 'white',
-                  color: colors.secondary,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  outline: 'none'
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '0.375rem'
                 }}
               >
                 {unLanguages.map(lang => (
@@ -612,11 +585,9 @@ const SaveButton = () => showSaveButton && (
                 opacity: !sourceText.trim() ? 0.5 : 1,
                 display: 'flex',
                 alignItems: 'center',
-              gap: '0.5rem',
-              minWidth: '100px',
-              justifyContent: 'center',
-              fontSize: '0.875rem',
-              fontWeight: 500
+                gap: '0.5rem',
+                minWidth: '100px',
+                justifyContent: 'center'
               }}
             >
               {isTranslating ? (
@@ -666,7 +637,7 @@ const SaveButton = () => showSaveButton && (
             )}
 
             {/* Translation Text Display */}
-<div 
+            <div 
   ref={textRef}
   style={{
     padding: '1rem',
@@ -676,17 +647,10 @@ const SaveButton = () => showSaveButton && (
     position: 'relative',
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
-    userSelect: 'text',
-    cursor: 'text',
-    lineHeight: '1.5'  // Added for better readability
+    userSelect: 'text', // Add this
+    cursor: 'text'      // Add this
   }}
   onMouseUp={handleTextSelection}
-  onBlur={(e) => {
-    // Only hide toolbar if we're not clicking inside it
-    if (!e.relatedTarget?.closest('.toolbar-button')) {
-      setTimeout(() => setShowFloatingToolbar(false), 200);
-    }
-  }}
 >
   {translatedText.split('').map((char, index) => {
     const modifiedRange = tempModifiedRanges.find(
@@ -711,7 +675,6 @@ const SaveButton = () => showSaveButton && (
   })}
   <FloatingToolbar />
 </div>
-            
           </div>
         </div>
 
@@ -921,7 +884,6 @@ const SaveButton = () => showSaveButton && (
 
     
       <SaveButton />
-      </div>
     </div>
   );
 }
