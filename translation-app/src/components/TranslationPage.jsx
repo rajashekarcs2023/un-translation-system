@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Edit2, Check, X, Wand2 } from 'lucide-react';
+import { Send, Edit2, Upload, Check, X, Wand2 } from 'lucide-react';
 
 // Add this colors object right after the imports
 const colors = {
@@ -37,7 +37,47 @@ function TranslationPage() {
   const [tempModifiedRanges, setTempModifiedRanges] = useState([]);
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [showCopyNotification, setShowCopyNotification] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [fileName, setFileName] = useState('');
   // Add after your state declarations
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+    
+    setFileName(file.name);
+    
+    try {
+      if (file.type === 'application/pdf') {
+        // Handle PDF file
+        const formData = new FormData();
+        formData.append('file', file);
+  
+        const response = await fetch('http://localhost:8000/api/upload-pdf', {
+          method: 'POST',
+          body: formData
+        });
+  
+        if (!response.ok) {
+          throw new Error('Failed to upload PDF');
+        }
+  
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        setSourceText(data.text);
+      } else {
+        // Handle text files
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setSourceText(e.target.result);
+        };
+        reader.readAsText(file);
+      }
+    } catch (error) {
+      console.error('File upload error:', error);
+      alert('Failed to upload file: ' + error.message);
+    }
+  };
 const Header = () => (
   <header style={{
     backgroundColor: colors.primary,
@@ -499,8 +539,8 @@ const SaveButton = () => showSaveButton && (
 // Remove handleSaveEdit function as it's no longer needed
 
 // ... rest of the code remains the same ...
-  return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+return (
+  <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
     <Header />
     <div style={{ 
       display: 'flex', 
@@ -512,33 +552,122 @@ const SaveButton = () => showSaveButton && (
     }}>
       {/* Left Panel */}
       <div style={{ 
-  width: `${leftWidth}%`,
-  minWidth: '15%',
-  maxWidth: '70%',
-  borderRight: `1px solid ${colors.neutral.medium}`,
-  display: 'flex',
-  flexDirection: 'column',
-  backgroundColor: colors.neutral.light,
-  boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-}}>
-        <div style={{ padding: '1rem', borderBottom: `1px solid ${colors.neutral.medium}`,backgroundColor: 'white' }}>
-          <h2 style={{ margin: 0, marginBottom: '0.5rem',color: colors.secondary,fontSize: '1.25rem' }}>Original Text</h2>
+        width: `${leftWidth}%`,
+        minWidth: '15%',
+        maxWidth: '70%',
+        borderRight: `1px solid ${colors.neutral.medium}`,
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: colors.neutral.light,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+      }}>
+        <div style={{ 
+          padding: '1rem', 
+          borderBottom: `1px solid ${colors.neutral.medium}`,
+          backgroundColor: 'white',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <h2 style={{ 
+            margin: 0,
+            color: colors.secondary,
+            fontSize: '1.25rem' 
+          }}>Original Text</h2>
+          
+          <div style={{ position: 'relative' }}>
+            <input
+              type="file"
+              id="file-upload"
+              onChange={(e) => handleFileUpload(e.target.files[0])}
+              style={{ display: 'none' }}
+            />
+            <label
+              htmlFor="file-upload"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                backgroundColor: colors.primary,
+                color: 'white',
+                borderRadius: '0.375rem',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                transition: 'background-color 0.2s'
+              }}
+            >
+              <Upload size={16} />
+              Upload File
+            </label>
+          </div>
         </div>
-        <div style={{ padding: '1rem', flex: 1, overflow: 'hidden' }}>
+
+        <div 
+          style={{ 
+            padding: '1rem', 
+            flex: 1, 
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            const file = e.dataTransfer.files[0];
+            handleFileUpload(file);
+          }}
+        >
+          {fileName && (
+            <div style={{
+              marginBottom: '1rem',
+              padding: '0.5rem',
+              backgroundColor: colors.neutral.light,
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <svg 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              {fileName}
+            </div>
+          )}
+
           <textarea
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
-            placeholder="Paste or type your text here..."
+            placeholder={isDragging ? 'Drop your file here' : 'Enter or paste your text here, or drop a file'}
             style={{
               width: '100%',
               height: '100%',
               padding: '1rem',
-              border: '1px solid #e5e7eb',
+              border: `2px dashed ${isDragging ? colors.primary : '#e5e7eb'}`,
               borderRadius: '0.375rem',
               resize: 'none',
               fontSize: '1rem',
               lineHeight: '1.5',
-              overflowY: 'auto'
+              overflowY: 'auto',
+              backgroundColor: isDragging ? colors.neutral.light : 'white',
+              transition: 'all 0.2s'
             }}
           />
         </div>
