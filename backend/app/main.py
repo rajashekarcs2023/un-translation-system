@@ -1,17 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes.translate import router
+from app.api.routes import translate, improve
 
 app = FastAPI()
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Your React app URL
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include only the translation router
-app.include_router(router, prefix="/api")
+app.include_router(translate.router, prefix="/api")
+app.include_router(improve.router, prefix="/api")
+
+@app.get("/")
+async def root():
+    return {"message": "Translation API is running"}

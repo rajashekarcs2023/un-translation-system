@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Send, Edit2, Check, X } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Edit2, Check, X, Wand2 } from 'lucide-react';
 
 function TranslationPage() {
   // All state variables
@@ -17,6 +17,9 @@ function TranslationPage() {
   const [selectedTranslatedText, setSelectedTranslatedText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [hoveringSuggestion, setHoveringSuggestion] = useState(null);
+  const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
+  const [modifiedRanges, setModifiedRanges] = useState([]);
 
   // Refs
   const textRef = useRef(null);
@@ -39,12 +42,105 @@ function TranslationPage() {
   const [rightWidth, setRightWidth] = useState(33);
   const middleWidth = 100 - leftWidth - rightWidth;
 
+  // Click outside handler for floating toolbar
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (textRef.current && !textRef.current.contains(e.target)) {
+        setShowFloatingToolbar(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Text selection handler
+  const handleTextSelection = () => {
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+    
+    if (selectedText && textRef.current) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const containerRect = textRef.current.getBoundingClientRect();
+
+      // Calculate selection range
+      const start = getTextOffset(textRef.current, range.startContainer, range.startOffset);
+      const end = start + selectedText.length;
+
+      // Update selection states
+      setSelectedTextRange({ start, end });
+      setSelectedTranslatedText(selectedText);
+
+      // Show floating toolbar
+      setToolbarPosition({
+        top: rect.top - containerRect.top - 40,
+        left: rect.left + (rect.width / 2) - containerRect.left
+      });
+      setShowFloatingToolbar(true);
+    } else {
+      setShowFloatingToolbar(false);
+      setSelectedTranslatedText('');
+      setSelectedTextRange({ start: 0, end: 0 });
+    }
+  };
+
+  // Helper function for text offset calculation
+  const getTextOffset = (rootNode, targetNode, targetOffset) => {
+    const walker = document.createTreeWalker(
+      rootNode,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+
+    let offset = 0;
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node === targetNode) {
+        return offset + targetOffset;
+      }
+      offset += node.textContent.length;
+    }
+    return offset;
+  };
+
+  // Resize handlers
+  const handleMouseDown = (e, resizer) => {
+    isDraggingRef.current = true;
+    currentResizerRef.current = resizer;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDraggingRef.current) return;
+    const containerWidth = window.innerWidth;
+    const newPosition = (e.clientX / containerWidth) * 100;
+    if (currentResizerRef.current === 'left') {
+      const newLeftWidth = Math.max(15, Math.min(70, newPosition));
+      setLeftWidth(newLeftWidth);
+    } else if (currentResizerRef.current === 'right') {
+      const newRightWidth = Math.max(15, Math.min(70, 100 - newPosition));
+      setRightWidth(newRightWidth);
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+    currentResizerRef.current = null;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
   // Handle translation
   const handleTranslate = async () => {
     if (!sourceText.trim()) return;
     
     setIsTranslating(true);
     setEditedText('');
+    setModifiedRanges([]); // Reset modification tracking
     try {
       const response = await fetch('http://localhost:8000/api/translate', {
         method: 'POST',
@@ -96,51 +192,121 @@ function TranslationPage() {
       }
 
       const data = await response.json();
-      const suggestions = data.suggestions.split('\n').filter(s => s.trim());
-      
       setChatMessages(prev => [
         ...prev,
         { 
           role: 'assistant', 
           content: `Suggestions for "${selectedTranslatedText}":`,
-          suggestions: suggestions
+          suggestions: data.suggestions
         }
       ]);
     } catch (error) {
       console.error('Improvement error:', error);
     } finally {
       setIsImproving(false);
+      setShowFloatingToolbar(false);
     }
   };
 
-  // Resize handlers
-  const handleMouseDown = (e, resizer) => {
-    isDraggingRef.current = true;
-    currentResizerRef.current = resizer;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDraggingRef.current) return;
-    const containerWidth = window.innerWidth;
-    const newPosition = (e.clientX / containerWidth) * 100;
-    if (currentResizerRef.current === 'left') {
-      const newLeftWidth = Math.max(15, Math.min(70, newPosition));
-      setLeftWidth(newLeftWidth);
-    } else if (currentResizerRef.current === 'right') {
-      const newRightWidth = Math.max(15, Math.min(70, 100 - newPosition));
-      setRightWidth(newRightWidth);
+  // Handle suggestion application
+  const handleApplySuggestion = (suggestion) => {
+    if (!selectedTranslatedText || selectedTextRange.start === selectedTextRange.end) {
+      return;
     }
+
+    const textBefore = translatedText.substring(0, selectedTextRange.start);
+    const textAfter = translatedText.substring(selectedTextRange.end);
+    const newText = textBefore + suggestion + textAfter;
+    
+    setTranslatedText(newText);
+    setModifiedRanges(prev => [...prev, {
+      start: selectedTextRange.start,
+      end: selectedTextRange.start + suggestion.length,
+      type: 'suggestion'
+    }]);
+
+    setSelectedTranslatedText('');
+    setSelectedTextRange({ start: 0, end: 0 });
   };
 
-  const handleMouseUp = () => {
-    isDraggingRef.current = false;
-    currentResizerRef.current = null;
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
+  // Handle editing save
+  const handleSaveEdit = () => {
+    if (!selectedTextRange.start && !selectedTextRange.end) return;
+    
+    const before = translatedText.substring(0, selectedTextRange.start);
+    const after = translatedText.substring(selectedTextRange.end);
+    const newText = before + editedText + after;
+    
+    setTranslatedText(newText);
+    setModifiedRanges(prev => [...prev, {
+      start: selectedTextRange.start,
+      end: selectedTextRange.start + editedText.length,
+      type: 'edit'
+    }]);
+    
+    setIsEditing(false);
+    setSelectedTranslatedText('');
+    setSelectedTextRange({ start: 0, end: 0 });
   };
 
+  // Floating Toolbar Component
+  const FloatingToolbar = () => showFloatingToolbar && (
+    <div
+      style={{
+        position: 'absolute',
+        top: `${toolbarPosition.top}px`,
+        left: `${toolbarPosition.left}px`,
+        transform: 'translateX(-50%)',
+        backgroundColor: 'white',
+        padding: '0.5rem',
+        borderRadius: '0.375rem',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+        display: 'flex',
+        gap: '0.5rem',
+        zIndex: 1000
+      }}
+    >
+      <button
+        onClick={() => {
+          setEditedText(selectedTranslatedText);
+          setIsEditing(true);
+          setShowFloatingToolbar(false);
+        }}
+        style={{
+          padding: '0.25rem 0.5rem',
+          backgroundColor: '#f3f4f6',
+          border: '1px solid #e5e7eb',
+          borderRadius: '0.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.25rem',
+          cursor: 'pointer'
+        }}
+      >
+        <Edit2 size={14} />
+        Edit
+      </button>
+      <button
+        onClick={() => {
+          handleImproveWithAI();
+          setShowFloatingToolbar(false);
+        }}
+        style={{
+          padding: '0.25rem 0.5rem',
+          backgroundColor: '#f3f4f6',
+          border: '1px solid #e5e7eb',
+          borderRadius: '0.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.25rem',
+          cursor: 'pointer'
+        }}
+      >
+        <Wand2 size={14} />
+        Improve
+      </button>
+    </div>
+  );
   return (
     <div style={{ 
       display: 'flex', 
@@ -204,7 +370,7 @@ function TranslationPage() {
         flexDirection: 'column',
         backgroundColor: 'white'
       }}>
-        {/* Header */}
+        {/* Header with Language Selection */}
         <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             <div style={{ 
@@ -228,9 +394,7 @@ function TranslationPage() {
                 }}
               >
                 {unLanguages.map(lang => (
-                  <option key={lang} value={lang}>
-                    {lang}
-                  </option>
+                  <option key={lang} value={lang}>{lang}</option>
                 ))}
               </select>
             </div>
@@ -267,6 +431,38 @@ function TranslationPage() {
         {/* Translation Content Area */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <div style={{ padding: '1rem' }}>
+            {/* Modified Ranges Legend */}
+            {modifiedRanges.length > 0 && (
+              <div style={{ 
+                padding: '0.5rem', 
+                display: 'flex', 
+                gap: '1rem',
+                fontSize: '0.875rem',
+                color: '#666',
+                marginBottom: '0.5rem'
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <span style={{ 
+                    width: '12px', 
+                    height: '12px', 
+                    backgroundColor: 'rgba(147, 197, 253, 0.3)',
+                    borderRadius: '2px'
+                  }} />
+                  AI Suggestions
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <span style={{ 
+                    width: '12px', 
+                    height: '12px', 
+                    backgroundColor: 'rgba(110, 231, 183, 0.3)',
+                    borderRadius: '2px'
+                  }} />
+                  Manual Edits
+                </span>
+              </div>
+            )}
+
+            {/* Translation Text Display */}
             <div 
               ref={textRef}
               style={{
@@ -274,27 +470,33 @@ function TranslationPage() {
                 backgroundColor: '#f9fafb',
                 borderRadius: '0.375rem',
                 minHeight: '100px',
+                position: 'relative',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}
-              onMouseUp={() => {
-                const selection = window.getSelection();
-                const selectedText = selection.toString().trim();
-                if (selectedText && textRef.current) {
-                  const range = selection.getRangeAt(0);
-                  const preCaretRange = range.cloneRange();
-                  preCaretRange.selectNodeContents(textRef.current);
-                  preCaretRange.setEnd(range.startContainer, range.startOffset);
-                  const start = preCaretRange.toString().length;
-                  setSelectedTextRange({
-                    start,
-                    end: start + selectedText.length
-                  });
-                  setSelectedTranslatedText(selectedText);
-                }
-              }}
+              onMouseUp={handleTextSelection}
             >
-              {translatedText || "Translation will appear here"}
+              {translatedText.split('').map((char, index) => {
+                const modifiedRange = modifiedRanges.find(
+                  range => index >= range.start && index < range.end
+                );
+                
+                return (
+                  <span
+                    key={index}
+                    style={{
+                      backgroundColor: modifiedRange 
+                        ? modifiedRange.type === 'suggestion' 
+                          ? 'rgba(147, 197, 253, 0.3)'
+                          : 'rgba(110, 231, 183, 0.3)'
+                        : 'transparent'
+                    }}
+                  >
+                    {char}
+                  </span>
+                );
+              })}
+              <FloatingToolbar />
             </div>
           </div>
         </div>
@@ -411,13 +613,7 @@ function TranslationPage() {
                       key={sugIndex}
                       onMouseEnter={() => setHoveringSuggestion(sugIndex)}
                       onMouseLeave={() => setHoveringSuggestion(null)}
-                      onClick={() => {
-                        const before = translatedText.slice(0, selectedTextRange.start);
-                        const after = translatedText.slice(selectedTextRange.end);
-                        setTranslatedText(before + suggestion + after);
-                        setSelectedTranslatedText('');
-                        setSelectedTextRange({ start: 0, end: 0 });
-                      }}
+                      onClick={() => handleApplySuggestion(suggestion)}
                       style={{
                         padding: '0.5rem',
                         margin: '0.25rem 0',
@@ -435,9 +631,7 @@ function TranslationPage() {
                           color: '#22c55e', 
                           marginLeft: '0.5rem',
                           fontSize: '1.25rem' 
-                        }}>
-                          ✓
-                        </span>
+                        }}>✓</span>
                       )}
                     </div>
                   ))}
@@ -488,6 +682,71 @@ function TranslationPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {isEditing && (
+        <div style={{ 
+          position: 'fixed', 
+          top: '50%', 
+          left: '50%', 
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          padding: '1rem',
+          borderRadius: '0.5rem',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          zIndex: 1000,
+          width: '90%',
+          maxWidth: '500px'
+        }}>
+          <textarea
+            value={editedText}
+            onChange={(e) => setEditedText(e.target.value)}
+            style={{
+              width: '100%',
+              minHeight: '100px',
+              padding: '0.5rem',
+              border: '1px solid #e5e7eb',
+              borderRadius: '0.375rem',
+              marginBottom: '1rem'
+            }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+            <button
+              onClick={handleSaveEdit}
+              style={{
+                backgroundColor: '#22c55e',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.375rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem'
+              }}
+            >
+              <Check size={16} />
+              Save
+            </button>
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                setEditedText('');
+              }}
+              style={{
+                backgroundColor: 'white',
+                border: '1px solid #e5e7eb',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.375rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem'
+              }}
+            >
+              <X size={16} />
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
