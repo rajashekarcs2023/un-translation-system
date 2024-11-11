@@ -1,0 +1,28 @@
+flowchart TD
+    subgraph "Data Collection Layer"
+        A[Label Studio] --> B[PostgreSQL]
+        C[Argilla] --> B
+    end
+
+    subgraph "Data Processing Layer"
+        B --> D[DVC]
+        D --> E[MLflow]
+    end
+
+    subgraph "Training Layer"
+        E --> F[Hugging Face Transformers]
+        F --> G[Weights & Biases]
+    end
+
+    subgraph "Deployment Layer"
+        G --> H[FastAPI]
+        H --> I[Docker]
+        I --> J[Kubernetes]
+    end
+
+    subgraph "Orchestration"
+        K[Airflow/ZenML] --> A
+        K --> C
+        K --> E
+        K --> G
+    end
