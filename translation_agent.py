@@ -5,7 +5,7 @@ import requests
 import json
 
 # Groq API Key (replace with your key)
-GROQ_API_KEY = "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"
+GROQ_API_KEY = ""
 
 class DocumentType(str, Enum):
     TECHNICAL = "technical"
