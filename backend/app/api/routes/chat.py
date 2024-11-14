@@ -25,7 +25,7 @@ async def chat(request: ChatRequest):
             {
                 "role": "system",
                 "content": """You are a helpful translation assistant. Help users understand and improve their translations.
-                When appropriate, provide specific suggestions for improving the translation."""
+                When appropriate, provide specific suggestions for improving the translation. So when I ask how can I imporve, dont give me long paragraphs of suggestions, just in give in the format of what alternative words I coudl use for technical terms in the forma of a list for each technical word in the form of bullet points for each word."""
             }
         ]
         
