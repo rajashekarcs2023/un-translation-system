@@ -141,4 +141,8 @@ The React-based frontend provides users with a streamlined, accessible interface
 
 This project is licensed under the MIT License.
 
+### Citations
+
+Ziemski, M., Junczys-Dowmunt, M., and Pouliquen, B., (2016), The United Nations Parallel Corpus, Language Resources and Evaluation (LREC’16), Portorož, Slovenia, May 2016.
+
 Translate4Good combines the power of FastAPI and React to create an efficient and accurate translation system tailored for the UNCCD's complex requirements. This tool not only provides high-quality translations but also helps streamline workflows for UN translators, ultimately enhancing their ability to manage vast amounts of content across multiple languages.
